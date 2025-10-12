@@ -1,0 +1,7 @@
+venv311/
+build/
+ping_db.sqlite3
+Pinger.spec
+requirements.txt
+server.py
+client.py
