@@ -13,12 +13,102 @@ import asyncio
 import websockets
 from requests.exceptions import RequestException
 from PyQt5 import QtCore, QtGui, QtWidgets
-
 import math
 import wave
 import struct
 import tempfile
 import atexit
+import shutil
+from pathlib import Path
+
+IS_WINDOWS = platform.system() == "Windows"
+APP_NAME = "Pinger"
+LOCAL_APP_DIR = Path(os.getenv("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / APP_NAME
+
+def create_windows_shortcut(target_path, shortcut_path):
+    try:
+        from win32com.client import Dispatch
+        shell = Dispatch('WScript.Shell')
+        shortcut = shell.CreateShortCut(str(shortcut_path))
+        shortcut.Targetpath = str(target_path)
+        shortcut.WorkingDirectory = str(Path(target_path).parent)
+        shortcut.IconLocation = str(target_path)
+        shortcut.save()
+        return True
+    except ImportError:
+        print("win32com not available, creating .url shortcut instead")
+        try:
+            content = (
+                "[InternetShortcut]\n"
+                f"URL=file:///{Path(target_path).resolve().as_posix()}\n"
+                "IconIndex=0\n"
+                f"IconFile={Path(target_path).resolve().as_posix()}\n"
+            )
+            shortcut_path = shortcut_path.with_suffix('.url')
+            shortcut_path.write_text(content, encoding="utf-8")
+            return True
+        except Exception as e:
+            print(f"Failed to create .url shortcut: {e}")
+            return False
+    except Exception as e:
+        print(f"Failed to create Windows shortcut: {e}")
+        return False
+
+def self_install():
+    try:
+        if getattr(sys, 'frozen', False):
+            current_exe = Path(sys.executable)
+        else:
+            current_exe = Path(sys.argv[0])
+            if current_exe.suffix != '.exe':
+                print("Running as Python script, skipping self-installation")
+                return True
+                
+        if not current_exe.is_absolute():
+            current_exe = Path.cwd() / current_exe
+        current_exe = current_exe.resolve()
+        
+        target_exe = LOCAL_APP_DIR / f"{APP_NAME}.exe"
+        
+        if current_exe == target_exe:
+            print("Already running from installed location, skipping self-installation")
+            return True
+            
+        LOCAL_APP_DIR.mkdir(parents=True, exist_ok=True)
+        
+        print(f"Installing {APP_NAME} to: {target_exe}")
+        shutil.copy2(current_exe, target_exe)
+        print("✓ Application copied to AppData")
+        
+        if IS_WINDOWS:
+            try:
+                desktop = Path.home() / "Desktop"
+                shortcut_file = desktop / f"{APP_NAME}.lnk"
+                if create_windows_shortcut(target_exe, shortcut_file):
+                    print(f"✓ Desktop shortcut created: {shortcut_file}")
+                else:
+                    print("✗ Failed to create desktop shortcut")
+            except Exception as e:
+                print(f"✗ Failed to create desktop shortcut: {e}")
+        
+        if IS_WINDOWS:
+            try:
+                start_menu = Path(os.environ.get('APPDATA', Path.home() / "AppData" / "Roaming")) / "Microsoft" / "Windows" / "Start Menu" / "Programs"
+                start_menu.mkdir(parents=True, exist_ok=True)
+                start_menu_shortcut = start_menu / f"{APP_NAME}.lnk"
+                if create_windows_shortcut(target_exe, start_menu_shortcut):
+                    print(f"✓ Start Menu shortcut created: {start_menu_shortcut}")
+                else:
+                    print("✗ Failed to create Start Menu shortcut")
+            except Exception as e:
+                print(f"✗ Failed to create Start Menu shortcut: {e}")
+        
+        print("✓ Self-installation completed successfully")
+        return True
+        
+    except Exception as e:
+        print(f"✗ Self-installation failed: {e}")
+        return False
 
 try:
     from PyQt5.QtMultimedia import QSoundEffect
@@ -34,7 +124,6 @@ if getattr(sys, 'frozen', False):
 DEFAULT_SERVER = "http://localhost:8000/"
 DEFAULT_USERNAME = None
 DEFAULT_INSTANCE = 1
-
 USERNAME_FROM_DEVICE = True
 DEV_MULTIPLE_INSTANCES = False
 
@@ -55,11 +144,9 @@ WINDOW_RADIUS = 14
 WINDOW_SIZE = 220
 PING_POPUP_DURATION = 5000
 
-APP_NAME = "Pinger"
 APP_VERSION = "1.0.0"
 ORGANIZATION_NAME = "Pinger"
 ORGANIZATION_DOMAIN = "pinger.local"
-
 FONT_FAMILY = "Segoe UI, Inter, Roboto, -apple-system, BlinkMacSystemFont, sans-serif"
 
 def resource_path(relative_path):
@@ -83,7 +170,10 @@ def derive_username(cli_username, instance):
     return f"{base}_{instance}" if DEV_MULTIPLE_INSTANCES else base
 
 def _get_autostart_command():
-    if getattr(sys, 'frozen', False):
+    installed_exe = LOCAL_APP_DIR / f"{APP_NAME}.exe"
+    if installed_exe.exists():
+        return f'"{installed_exe}"'
+    elif getattr(sys, 'frozen', False):
         return f'"{sys.executable}"'
     else:
         script = os.path.abspath(sys.argv[0])
@@ -417,7 +507,6 @@ X-GNOME-Autostart-enabled=true
         if self.parent:
             self.parent.close()
         QtWidgets.QApplication.quit()
-
 
 class PingClient:
     def __init__(self, server, username, uid, gui_signals):
@@ -916,7 +1005,6 @@ class PingWindow(QtWidgets.QWidget):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(14)
 
-        # FIX: Remove border from status container by making it transparent
         status_widget = QtWidgets.QWidget(
             styleSheet="background: transparent; border: none;"
         )
@@ -1110,6 +1198,12 @@ class PingWindow(QtWidgets.QWidget):
             event.accept()
 
 def main():
+    if getattr(sys, 'frozen', False) or (len(sys.argv) > 0 and sys.argv[0].endswith('.exe')):
+        print("Performing automatic self-installation...")
+        self_install()
+    else:
+        print("Running as Python script, skipping self-installation")
+    
     parser = argparse.ArgumentParser(description=APP_NAME)
     parser.add_argument("--server", default=None,
                        help=f"Server URL (default from settings or {DEFAULT_SERVER})")
