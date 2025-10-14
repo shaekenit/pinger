@@ -894,7 +894,7 @@ class PingWindow(QtWidgets.QWidget):
 
     def setup_window(self):
         self.resize(WINDOW_SIZE, WINDOW_SIZE)
-        self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Window)
+        self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Tool)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self.setStyleSheet("background-color: rgba(255, 255, 255, 0);")
 
