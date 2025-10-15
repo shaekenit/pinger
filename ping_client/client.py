@@ -13,6 +13,7 @@ import asyncio
 import websockets
 from requests.exceptions import RequestException
 from PyQt5 import QtCore, QtGui, QtWidgets
+from typing import Optional
 import math
 import wave
 import struct
@@ -216,6 +217,34 @@ def _create_ping_wav(duration_ms=400, freq1=784.0, freq2=1046.5, volume=0.4, sam
 
     atexit.register(_cleanup)
     return tmp_name
+
+class RoundedOverlay(QtWidgets.QWidget):
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None, radius: int = WINDOW_RADIUS, opacity: int = 120):
+        super().__init__(parent)
+        self._radius = radius
+        self._alpha = opacity
+        self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, False)
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
+        self.setAttribute(QtCore.Qt.WA_NoSystemBackground, True)
+        self.setWindowFlags(QtCore.Qt.Widget)
+        if parent:
+            self.setGeometry(parent.rect())
+            self.show()
+            self.raise_()
+
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        color = QtGui.QColor(0, 0, 0, self._alpha)
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QBrush(color))
+        rect = self.rect()
+        painter.drawRoundedRect(rect, self._radius, self._radius)
+        painter.end()
+
+    def resizeEvent(self, event):
+        self.update()
+        super().resizeEvent(event)
 
 class SoundPlayer:
     def __init__(self, parent=None, wav_path=None):
@@ -682,6 +711,8 @@ class PingNotification(QtWidgets.QWidget):
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self.setFixedSize(260, 110)
 
+        self.overlay = RoundedOverlay(self, radius=10, opacity=200)
+        
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 12)
         layout.setSpacing(8)
@@ -733,12 +764,9 @@ class PingNotification(QtWidgets.QWidget):
         self.progress_anim.start()
         self.close_timer.start(PING_POPUP_DURATION)
 
-    def paintEvent(self, event):
-        painter = QtGui.QPainter(self)
-        painter.setRenderHint(QtGui.QPainter.Antialiasing)
-        painter.setBrush(QtGui.QColor(COLORS["--background"]))
-        painter.setPen(QtGui.QPen(QtGui.QColor(COLORS["--primary"]), 1))
-        painter.drawRoundedRect(self.rect(), 10, 10)
+    def resizeEvent(self, event):
+        self.overlay.setGeometry(self.rect())
+        super().resizeEvent(event)
 
     def mousePressEvent(self, event):
         self.close()
@@ -989,6 +1017,8 @@ class PingWindow(QtWidgets.QWidget):
 
         self.setWindowTitle(f"{APP_NAME} - {self.username}")
 
+        self.overlay = RoundedOverlay(self, radius=WINDOW_RADIUS, opacity=200)
+
     def setup_ui(self):
         self.client = None
         self.signals = GuiSignals()
@@ -1081,6 +1111,7 @@ class PingWindow(QtWidgets.QWidget):
 
     def resizeEvent(self, event):
         self._central.setGeometry(self.rect())
+        self.overlay.setGeometry(self.rect())
 
     def mousePressEvent(self, event):
         if event.button() == QtCore.Qt.LeftButton:
@@ -1148,6 +1179,8 @@ class PingWindow(QtWidgets.QWidget):
             }}
         """)
 
+        popup_overlay = RoundedOverlay(popup, radius=10, opacity=200)
+        
         layout = QtWidgets.QVBoxLayout(popup)
         title_label = QtWidgets.QLabel(title, styleSheet=f"color: {color}; font-size: 13px; font-weight: 600; font-family: {FONT_FAMILY};")
         text_label = QtWidgets.QLabel(text, styleSheet=f"color: {COLORS['--text']}; font-size: 12px; font-family: {FONT_FAMILY};")
@@ -1174,6 +1207,12 @@ class PingWindow(QtWidgets.QWidget):
         popup.resize(200, 120)
         popup.move(self.geometry().center() - popup.rect().center())
         popup.show()
+
+        def resize_popup():
+            popup_overlay.setGeometry(popup.rect())
+            
+        popup.resizeEvent = lambda event: resize_popup()
+        resize_popup()
 
     def _on_ping_received(self, sender, ts):
         self.sound_player.play()
