@@ -24,12 +24,16 @@ from pathlib import Path
 
 IS_WINDOWS = platform.system() == "Windows"
 APP_NAME = "Pinger"
-LOCAL_APP_DIR = Path(os.getenv("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / APP_NAME
+LOCAL_APP_DIR = (
+    Path(os.getenv("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / APP_NAME
+)
+
 
 def create_windows_shortcut(target_path, shortcut_path):
     try:
         from win32com.client import Dispatch
-        shell = Dispatch('WScript.Shell')
+
+        shell = Dispatch("WScript.Shell")
         shortcut = shell.CreateShortCut(str(shortcut_path))
         shortcut.Targetpath = str(target_path)
         shortcut.WorkingDirectory = str(Path(target_path).parent)
@@ -45,7 +49,7 @@ def create_windows_shortcut(target_path, shortcut_path):
                 "IconIndex=0\n"
                 f"IconFile={Path(target_path).resolve().as_posix()}\n"
             )
-            shortcut_path = shortcut_path.with_suffix('.url')
+            shortcut_path = shortcut_path.with_suffix(".url")
             shortcut_path.write_text(content, encoding="utf-8")
             return True
         except Exception as e:
@@ -55,32 +59,33 @@ def create_windows_shortcut(target_path, shortcut_path):
         print(f"Failed to create Windows shortcut: {e}")
         return False
 
+
 def self_install():
     try:
-        if getattr(sys, 'frozen', False):
+        if getattr(sys, "frozen", False):
             current_exe = Path(sys.executable)
         else:
             current_exe = Path(sys.argv[0])
-            if current_exe.suffix != '.exe':
+            if current_exe.suffix != ".exe":
                 print("Running as Python script, skipping self-installation")
                 return True
-                
+
         if not current_exe.is_absolute():
             current_exe = Path.cwd() / current_exe
         current_exe = current_exe.resolve()
-        
+
         target_exe = LOCAL_APP_DIR / f"{APP_NAME}.exe"
-        
+
         if current_exe == target_exe:
             print("Already running from installed location, skipping self-installation")
             return True
-            
+
         LOCAL_APP_DIR.mkdir(parents=True, exist_ok=True)
-        
+
         print(f"Installing {APP_NAME} to: {target_exe}")
         shutil.copy2(current_exe, target_exe)
         print("✓ Application copied to AppData")
-        
+
         if IS_WINDOWS:
             try:
                 desktop = Path.home() / "Desktop"
@@ -91,10 +96,16 @@ def self_install():
                     print("✗ Failed to create desktop shortcut")
             except Exception as e:
                 print(f"✗ Failed to create desktop shortcut: {e}")
-        
+
         if IS_WINDOWS:
             try:
-                start_menu = Path(os.environ.get('APPDATA', Path.home() / "AppData" / "Roaming")) / "Microsoft" / "Windows" / "Start Menu" / "Programs"
+                start_menu = (
+                    Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+                    / "Microsoft"
+                    / "Windows"
+                    / "Start Menu"
+                    / "Programs"
+                )
                 start_menu.mkdir(parents=True, exist_ok=True)
                 start_menu_shortcut = start_menu / f"{APP_NAME}.lnk"
                 if create_windows_shortcut(target_exe, start_menu_shortcut):
@@ -103,23 +114,25 @@ def self_install():
                     print("✗ Failed to create Start Menu shortcut")
             except Exception as e:
                 print(f"✗ Failed to create Start Menu shortcut: {e}")
-        
+
         print("✓ Self-installation completed successfully")
         return True
-        
+
     except Exception as e:
         print(f"✗ Self-installation failed: {e}")
         return False
+
 
 try:
     from PyQt5.QtMultimedia import QSoundEffect
 except Exception:
     QSoundEffect = None
 
-if getattr(sys, 'frozen', False):
+if getattr(sys, "frozen", False):
     import warnings
+
     warnings.filterwarnings("ignore", category=DeprecationWarning)
-    if sys.platform == 'win32':
+    if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 DEFAULT_SERVER = "http://localhost:8000/"
@@ -131,13 +144,14 @@ DEV_MULTIPLE_INSTANCES = False
 COLORS = {
     "--text": "#e8eeed",
     "--background": "#1a1a1a",
+    "--dim-background": "#0C0C0C",
     "--primary": "#404040",
     "--secondary": "#2d2d2d",
     "--accent": "#555555",
     "--success": "#4caf50",
     "--error": "#f44336",
     "--muted": "#666666",
-    "--highlight": "#7e7e7e"
+    "--highlight": "#7e7e7e",
 }
 
 DEFAULT_TIMEOUT = 5.0
@@ -150,18 +164,21 @@ ORGANIZATION_NAME = "Pinger"
 ORGANIZATION_DOMAIN = "pinger.local"
 FONT_FAMILY = "Segoe UI, Inter, Roboto, -apple-system, BlinkMacSystemFont, sans-serif"
 
+
 def resource_path(relative_path):
-    if hasattr(sys, '_MEIPASS'):
+    if hasattr(sys, "_MEIPASS"):
         base_path = sys._MEIPASS
     else:
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
+
 
 def generate_uid():
     try:
         return str(uuid.uuid7())
     except AttributeError:
         return str(uuid.uuid1())
+
 
 def derive_username(cli_username, instance):
     if USERNAME_FROM_DEVICE:
@@ -170,17 +187,21 @@ def derive_username(cli_username, instance):
     base = cli_username or "unknown-user"
     return f"{base}_{instance}" if DEV_MULTIPLE_INSTANCES else base
 
+
 def _get_autostart_command():
     installed_exe = LOCAL_APP_DIR / f"{APP_NAME}.exe"
     if installed_exe.exists():
         return f'"{installed_exe}"'
-    elif getattr(sys, 'frozen', False):
+    elif getattr(sys, "frozen", False):
         return f'"{sys.executable}"'
     else:
         script = os.path.abspath(sys.argv[0])
         return f'"{sys.executable}" "{script}"'
 
-def _create_ping_wav(duration_ms=400, freq1=784.0, freq2=1046.5, volume=0.4, sample_rate=44100):
+
+def _create_ping_wav(
+    duration_ms=400, freq1=784.0, freq2=1046.5, volume=0.4, sample_rate=44100
+):
     nframes = int(sample_rate * (duration_ms / 1000.0))
     amplitude = int(32767 * max(0.0, min(1.0, volume)))
 
@@ -218,8 +239,14 @@ def _create_ping_wav(duration_ms=400, freq1=784.0, freq2=1046.5, volume=0.4, sam
     atexit.register(_cleanup)
     return tmp_name
 
+
 class RoundedOverlay(QtWidgets.QWidget):
-    def __init__(self, parent: Optional[QtWidgets.QWidget] = None, radius: int = WINDOW_RADIUS, opacity: int = 120):
+    def __init__(
+        self,
+        parent: Optional[QtWidgets.QWidget] = None,
+        radius: int = WINDOW_RADIUS,
+        opacity: int = 120,
+    ):
         super().__init__(parent)
         self._radius = radius
         self._alpha = opacity
@@ -245,6 +272,7 @@ class RoundedOverlay(QtWidgets.QWidget):
     def resizeEvent(self, event):
         self.update()
         super().resizeEvent(event)
+
 
 class SoundPlayer:
     def __init__(self, parent=None, wav_path=None):
@@ -275,171 +303,270 @@ class SoundPlayer:
         if sys.platform == "win32":
             try:
                 import winsound
-                winsound.PlaySound(self.wav_path, winsound.SND_FILENAME | winsound.SND_ASYNC)
+
+                winsound.PlaySound(
+                    self.wav_path, winsound.SND_FILENAME | winsound.SND_ASYNC
+                )
                 return
             except Exception:
                 pass
 
         return
 
+
+class NonClosingMenu(QtWidgets.QMenu):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+    def mousePressEvent(self, event):
+        widget = self.childAt(event.pos())
+        if widget and (
+            isinstance(widget, QtWidgets.QLineEdit)
+            or widget.findChild(QtWidgets.QLineEdit)
+        ):
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def focusOutEvent(self, event):
+        pass
+
+    def hideEvent(self, event):
+        if not self.property("prevent_hide"):
+            super().hideEvent(event)
+
+
 class SystemTrayIcon(QtWidgets.QSystemTrayIcon):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent = parent
         self.settings = QtCore.QSettings()
-        
+
         if not QtWidgets.QSystemTrayIcon.isSystemTrayAvailable():
-            QtWidgets.QMessageBox.critical(None, "System Tray", "System tray not available")
+            QtWidgets.QMessageBox.critical(
+                None, "System Tray", "System tray not available"
+            )
             sys.exit(1)
-        
+
+        self._save_timer = QtCore.QTimer(self)
+        self._save_timer.setSingleShot(True)
+        self._save_timer.setInterval(250)
+        self._save_timer.timeout.connect(self._on_save_timer_timeout)
+
         self.create_icon()
         self.setup_context_menu()
         self.setup_signals()
         self.setup_tooltip()
         self.setup_autostart()
-        
+
+    def eventFilter(self, obj, event):
+        if obj == getattr(self, "server_input", None):
+            if event.type() == QtCore.QEvent.KeyPress:
+                key = event.key()
+                if key in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
+                    self._save_timer.stop()
+                    self.save_server_url(self.server_input.text())
+                    return True
+            return False
+
+        if obj == getattr(self, "menu", None):
+            if event.type() == QtCore.QEvent.KeyPress:
+                key = event.key()
+                if key in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
+                    return True
+            return False
+
+        return super().eventFilter(obj, event)
+
     def create_icon(self):
         icon_path = resource_path("app_icon.png")
         if os.path.exists(icon_path):
             try:
                 pixmap = QtGui.QPixmap(icon_path)
                 if not pixmap.isNull():
-                    pixmap = pixmap.scaled(64, 64, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+                    pixmap = pixmap.scaled(
+                        64,
+                        64,
+                        QtCore.Qt.KeepAspectRatio,
+                        QtCore.Qt.SmoothTransformation,
+                    )
                     self.setIcon(QtGui.QIcon(pixmap))
                     return
             except Exception as e:
                 print(f"Failed to load external icon: {e}")
-        
+
         size = 64
         pixmap = QtGui.QPixmap(size, size)
         pixmap.fill(QtCore.Qt.transparent)
-        
+
         painter = QtGui.QPainter(pixmap)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
-        
-        gradient = QtGui.QRadialGradient(size//2, size//2, size//2)
+
+        gradient = QtGui.QRadialGradient(size // 2, size // 2, size // 2)
         gradient.setColorAt(0, QtGui.QColor(COLORS["--accent"]))
         gradient.setColorAt(1, QtGui.QColor(COLORS["--primary"]))
-        
+
         painter.setBrush(QtGui.QBrush(gradient))
         painter.setPen(QtCore.Qt.NoPen)
-        painter.drawEllipse(8, 8, size-16, size-16)
-        
+        painter.drawEllipse(8, 8, size - 16, size - 16)
+
         painter.setBrush(QtGui.QColor(COLORS["--background"]))
-        painter.drawEllipse(size//2-6, size//2-6, 12, 12)
-        
+        painter.drawEllipse(size // 2 - 6, size // 2 - 6, 12, 12)
+
         painter.end()
         self.setIcon(QtGui.QIcon(pixmap))
-        
+
     def setup_context_menu(self):
         self.menu = QtWidgets.QMenu(self.parent)
         self.apply_menu_styling()
+
+        self.menu.setFocusPolicy(QtCore.Qt.NoFocus)
+        self.menu.setSeparatorsCollapsible(False)
+        self.menu.setActiveAction(None)
+
+        self.menu.installEventFilter(self)
 
         show_action = QtWidgets.QAction("Toggle Window", self.menu)
         show_action.triggered.connect(self.toggle_window_visibility)
         self.menu.addAction(show_action)
 
-        self.menu.addSeparator()
-        
         server_action = QtWidgets.QWidgetAction(self.menu)
         server_widget = QtWidgets.QWidget()
         server_layout = QtWidgets.QHBoxLayout(server_widget)
         server_layout.setContentsMargins(8, 6, 8, 6)
-        
+
         self.server_input = QtWidgets.QLineEdit()
         self.server_input.setPlaceholderText("Server URL")
         self.server_input.setText(self.settings.value("server_url", DEFAULT_SERVER))
+        self.server_input.setFixedWidth(420)
+        self.server_input.setFocusPolicy(QtCore.Qt.StrongFocus)
+        self.server_input.installEventFilter(self)
+        self.server_input.textChanged.connect(self._on_server_text_changed)
+
         self.server_input.setStyleSheet(f"""
             QLineEdit {{
-                background-color: {COLORS['--secondary']};
-                color: {COLORS['--text']};
-                border: 1px solid {COLORS['--primary']};
-                border-radius: 8px;
+                background-color: {COLORS["--dim-background"]};
+                color: {COLORS["--text"]};
+                border: 0px solid {COLORS["--secondary"]};
+                border-radius: 6px;
                 padding: 8px 12px;
                 font-size: 12px;
                 min-width: 160px;
-                selection-background-color: {COLORS['--accent']};
                 font-family: {FONT_FAMILY};
             }}
             QLineEdit:focus {{
-                border-color: {COLORS['--highlight']};
-                background-color: {COLORS['--secondary']};
+                border-color: {COLORS["--secondary"]};
+                background-color: {COLORS["--dim-background"]};
             }}
             QLineEdit::placeholder {{
-                color: {COLORS['--muted']};
+                color: {COLORS["--muted"]};
             }}
         """)
-        self.server_input.editingFinished.connect(lambda: self.save_server_url(self.server_input.text()))
+
         server_layout.addWidget(self.server_input)
-        
         server_action.setDefaultWidget(server_widget)
         self.menu.addAction(server_action)
-        
-        self.menu.addSeparator()
-        
+
         self.startup_action = QtWidgets.QAction("Start with system", self.menu)
         self.startup_action.setCheckable(True)
-        self.startup_action.setChecked(self.settings.value("autostart", True, type=bool))
+        self.startup_action.setChecked(
+            self.settings.value("autostart", True, type=bool)
+        )
         self.startup_action.triggered.connect(self.toggle_autostart)
         self.menu.addAction(self.startup_action)
-        
-        self.menu.addSeparator()
-        
+
         exit_action = QtWidgets.QAction("Exit", self.menu)
         exit_action.triggered.connect(self.exit_application)
         self.menu.addAction(exit_action)
-        
+
         self.setContextMenu(self.menu)
-        
+
+    def _on_server_text_changed(self, text):
+        self._save_timer.start()
+
+    def _on_save_timer_timeout(self):
+        if getattr(self, "server_input", None) is not None:
+            self.save_server_url(self.server_input.text())
+
     def apply_menu_styling(self):
+        self.menu.setWindowFlags(
+            self.menu.windowFlags()
+            | QtCore.Qt.FramelessWindowHint
+            | QtCore.Qt.NoDropShadowWindowHint
+        )
+        self.menu.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self.menu.setStyleSheet(f"""
             QMenu {{
-                background-color: {COLORS['--background']};
-                color: {COLORS['--text']};
-                border: 1px solid {COLORS['--primary']};
-                border-radius: 14px;
-                padding: 10px 6px;
+                background-color: {COLORS["--dim-background"]};
+                color: {COLORS["--text"]};
+                border: 1px solid {COLORS["--primary"]};
+                border-radius: 12px;
+                padding: 6px 4px;
                 font-family: {FONT_FAMILY};
                 font-size: 13px;
-                margin: 0px;
+                margin: 0;
             }}
             QMenu::item {{
-                padding: 10px 18px;
-                border-radius: 8px;
-                margin: 2px 4px;
-                background-color: transparent;
-                font-family: {FONT_FAMILY};
+                padding: 8px 16px;
+                border-radius: 6px;
+                margin: 3px 6px;
+                border: 1px solid {COLORS["--primary"]};
+                background-color: {COLORS["--background"]};
             }}
             QMenu::item:selected {{
-                background-color: {COLORS['--accent']};
-            }}
-            QMenu::separator {{
-                height: 1px;
-                background-color: {COLORS['--primary']};
-                margin: 8px 10px;
-                border-radius: 1px;
+                border: 1px dotted {COLORS["--primary"]};
+                background-color: {COLORS["--dim-background"]};
+                color: {COLORS["--text"]};
             }}
             QMenu::indicator {{
-                width: 16px;
-                height: 16px;
+                width: 4px;
+                height: 4px;
                 left: 10px;
+                margin: 2px 4px;
+                border: 1px solid {COLORS["--accent"]};
+                background: transparent;
+                border-radius: 16px;
             }}
+
             QMenu::indicator:checked {{
-                background-color: {COLORS['--success']};
-                border-radius: 8px;
+                border: 1px solid {COLORS["--accent"]};
+                width: 4px;
+                height: 4px;
+                left: 10px;
+                background: {COLORS["--success"]};
+                border-radius: 16px;
+            }}
+
+            QLineEdit {{
+                background-color: {COLORS["--dim-background"]};
+                color: {COLORS["--highlight"]};
+                border: 1px solid {COLORS["--secondary"]};
+                border-radius: 6px;
+                padding: 6px 10px;
+                font-size: 12px;
+                font-family: {FONT_FAMILY};
+                min-width: 200px;
+                selection-background-color: {COLORS["--background"]};
+            }}
+            QLineEdit:focus {{
+                border-color: {COLORS["--highlight"]};
+                background-color: {COLORS["--secondary"]};
+            }}
+            QLineEdit::placeholder {{
+                color: {COLORS["--muted"]};
             }}
         """)
-        
+
     def setup_signals(self):
         self.activated.connect(self.on_tray_activated)
-        
+
     def setup_tooltip(self):
         self.setToolTip(f"{APP_NAME}")
-        
+
     def setup_autostart(self):
         autostart_enabled = self.settings.value("autostart", True, type=bool)
         self.set_autostart(autostart_enabled)
-        
+
     def set_autostart(self, enable):
         if sys.platform == "win32":
             self._set_autostart_windows(enable)
@@ -447,45 +574,49 @@ class SystemTrayIcon(QtWidgets.QSystemTrayIcon):
             self._set_autostart_macos(enable)
         else:
             self._set_autostart_linux(enable)
-            
+
     def _set_autostart_windows(self, enable):
         try:
             import winreg
-            
+
             key = winreg.HKEY_CURRENT_USER
             subkey = r"Software\Microsoft\Windows\CurrentVersion\Run"
-            
+
             if enable:
                 app_path = _get_autostart_command()
-                
+
                 try:
-                    with winreg.OpenKey(key, subkey, 0, winreg.KEY_SET_VALUE) as reg_key:
+                    with winreg.OpenKey(
+                        key, subkey, 0, winreg.KEY_SET_VALUE
+                    ) as reg_key:
                         winreg.SetValueEx(reg_key, APP_NAME, 0, winreg.REG_SZ, app_path)
                     print(f"Autostart enabled: {app_path}")
                 except Exception as e:
                     print(f"Failed to enable autostart: {e}")
             else:
                 try:
-                    with winreg.OpenKey(key, subkey, 0, winreg.KEY_SET_VALUE) as reg_key:
+                    with winreg.OpenKey(
+                        key, subkey, 0, winreg.KEY_SET_VALUE
+                    ) as reg_key:
                         winreg.DeleteValue(reg_key, APP_NAME)
                     print("Autostart disabled")
                 except FileNotFoundError:
                     pass
-                    
+
         except ImportError:
             print("winreg not available")
-            
+
     def _set_autostart_macos(self, enable):
         print(f"macOS autostart would be {'enabled' if enable else 'disabled'}")
-        
+
     def _set_autostart_linux(self, enable):
         autostart_dir = os.path.expanduser("~/.config/autostart")
         desktop_file = os.path.join(autostart_dir, f"{APP_NAME}.desktop")
-        
+
         if enable:
             os.makedirs(autostart_dir, exist_ok=True)
             app_path = _get_autostart_command()
-                
+
             desktop_content = f"""[Desktop Entry]
 Type=Application
 Name={APP_NAME}
@@ -495,7 +626,7 @@ NoDisplay=false
 X-GNOME-Autostart-enabled=true
 """
             try:
-                with open(desktop_file, 'w') as f:
+                with open(desktop_file, "w") as f:
                     f.write(desktop_content)
                 print(f"Autostart enabled: {desktop_file}")
             except Exception as e:
@@ -507,39 +638,43 @@ X-GNOME-Autostart-enabled=true
                 print("Autostart disabled")
             except Exception as e:
                 print(f"Failed to disable autostart: {e}")
-        
+
     def save_server_url(self, url):
         self.settings.setValue("server_url", url.strip())
         print(f"Server URL saved: {url.strip()}")
-        
+
     def get_server_url(self):
         return self.settings.value("server_url", DEFAULT_SERVER)
-        
+
     def toggle_autostart(self, enabled):
         self.settings.setValue("autostart", enabled)
         self.set_autostart(enabled)
-        
+
     def on_tray_activated(self, reason):
-        if reason in (QtWidgets.QSystemTrayIcon.DoubleClick, QtWidgets.QSystemTrayIcon.Trigger):
+        if reason in (
+            QtWidgets.QSystemTrayIcon.DoubleClick,
+            QtWidgets.QSystemTrayIcon.Trigger,
+        ):
             self.toggle_window_visibility()
-            
+
     def toggle_window_visibility(self):
-        if self.parent and hasattr(self.parent, 'isVisible'):
+        if self.parent and hasattr(self.parent, "isVisible"):
             if self.parent.isVisible():
                 self.parent.hide()
             else:
                 self.parent.show()
                 self.parent.raise_()
                 self.parent.activateWindow()
-        
+
     def exit_application(self):
         if self.parent:
             self.parent.close()
         QtWidgets.QApplication.quit()
 
+
 class PingClient:
     def __init__(self, server, username, uid, gui_signals):
-        self.server = server.rstrip('/')
+        self.server = server.rstrip("/")
         self.username = username
         self.uid = uid
         self.token = None
@@ -550,9 +685,11 @@ class PingClient:
         self.user_history = set()
 
     def login(self):
-        resp = requests.post(f"{self.server}/login",
-                           json={"username": self.username, "uid": self.uid},
-                           timeout=DEFAULT_TIMEOUT)
+        resp = requests.post(
+            f"{self.server}/login",
+            json={"username": self.username, "uid": self.uid},
+            timeout=DEFAULT_TIMEOUT,
+        )
         resp.raise_for_status()
         data = resp.json()
         self.token = data["token"]
@@ -566,7 +703,7 @@ class PingClient:
                     self.login()
                     return self.token
                 except RequestException:
-                    time.sleep(0.5 * (2 ** attempt))
+                    time.sleep(0.5 * (2**attempt))
             raise RuntimeError("Failed to obtain token")
         return self.token
 
@@ -581,10 +718,12 @@ class PingClient:
             self.gui_signals.user_history_updated.emit()
 
         try:
-            resp = requests.post(f"{self.server}/ping",
-                               json={"to": target},
-                               headers={"Authorization": f"Bearer {token}"},
-                               timeout=DEFAULT_TIMEOUT)
+            resp = requests.post(
+                f"{self.server}/ping",
+                json={"to": target},
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=DEFAULT_TIMEOUT,
+            )
             return resp.status_code, resp.json() if resp.text else resp.text
         except RequestException as e:
             return None, str(e)
@@ -600,7 +739,9 @@ class PingClient:
                 token = self.ensure_token()
                 ws_url = f"{url}?token={token}"
 
-                async with websockets.connect(ws_url, ping_interval=20, ping_timeout=10) as ws:
+                async with websockets.connect(
+                    ws_url, ping_interval=20, ping_timeout=10
+                ) as ws:
                     attempt = 0
                     self.gui_signals.ws_connected.emit()
 
@@ -612,7 +753,7 @@ class PingClient:
                             if parsed.get("type") in ("ping", "queued_ping"):
                                 self.gui_signals.ping_received.emit(
                                     parsed.get("from"),
-                                    float(parsed.get("ts", time.time()))
+                                    float(parsed.get("ts", time.time())),
                                 )
                             elif parsed.get("type") in ("clientlist"):
                                 clients = parsed.get("clients", [])
@@ -631,7 +772,7 @@ class PingClient:
             except Exception:
                 self.gui_signals.ws_disconnected.emit()
                 attempt += 1
-                await asyncio.sleep(min(30, 0.5 * (2 ** attempt)))
+                await asyncio.sleep(min(30, 0.5 * (2**attempt)))
 
     def start(self):
         try:
@@ -639,11 +780,14 @@ class PingClient:
         except Exception:
             pass
         self._stop_event.clear()
-        self._ws_thread = threading.Thread(target=lambda: asyncio.run(self._ws_run()), daemon=True)
+        self._ws_thread = threading.Thread(
+            target=lambda: asyncio.run(self._ws_run()), daemon=True
+        )
         self._ws_thread.start()
 
     def stop(self):
         self._stop_event.set()
+
 
 class GuiSignals(QtCore.QObject):
     ws_connected = QtCore.pyqtSignal()
@@ -655,6 +799,7 @@ class GuiSignals(QtCore.QObject):
     success = QtCore.pyqtSignal(str)
     user_list_updated = QtCore.pyqtSignal()
     user_history_updated = QtCore.pyqtSignal()
+
 
 class ConnectionIndicator(QtWidgets.QWidget):
     def __init__(self, parent=None):
@@ -670,9 +815,10 @@ class ConnectionIndicator(QtWidgets.QWidget):
         self._pulse_animation.setKeyValueAt(0.5, 1.0)
         self._pulse_animation.setKeyValueAt(1, 0.3)
 
-    pulse_value = QtCore.pyqtProperty(float,
+    pulse_value = QtCore.pyqtProperty(
+        float,
         lambda self: self._pulse_value,
-        lambda self, value: setattr(self, '_pulse_value', value) or self.update()
+        lambda self, value: setattr(self, "_pulse_value", value) or self.update(),
     )
 
     def set_connected(self, connected):
@@ -697,7 +843,7 @@ class ConnectionIndicator(QtWidgets.QWidget):
             painter.setBrush(color)
             painter.setPen(QtCore.Qt.NoPen)
             painter.drawEllipse(center_x - 10, center_y - 10, 20, 20)
-            
+
             painter.setBrush(QtGui.QColor(COLORS["--success"]))
             painter.drawEllipse(center_x - 5, center_y - 5, 10, 10)
         else:
@@ -705,35 +851,49 @@ class ConnectionIndicator(QtWidgets.QWidget):
             painter.setPen(QtCore.Qt.NoPen)
             painter.drawEllipse(center_x - 10, center_y - 10, 20, 20)
 
+
 class PingNotification(QtWidgets.QWidget):
     def __init__(self, parent, sender, ts):
-        super().__init__(parent, QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.Tool)
+        super().__init__(
+            parent,
+            QtCore.Qt.FramelessWindowHint
+            | QtCore.Qt.WindowStaysOnTopHint
+            | QtCore.Qt.Tool,
+        )
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self.setFixedSize(260, 110)
 
-        self.overlay = RoundedOverlay(self, radius=10, opacity=200)
-        
+        self.overlay = RoundedOverlay(self, radius=14, opacity=200)
+
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 12)
         layout.setSpacing(8)
 
         title = QtWidgets.QLabel("Incoming Ping")
-        title.setStyleSheet(f"font-family: {FONT_FAMILY}; font-weight: 600; font-size: 15px; color: {COLORS['--text']};")
+        title.setStyleSheet(
+            f"font-family: {FONT_FAMILY}; font-weight: 600; font-size: 15px; color: {COLORS['--text']};"
+        )
         layout.addWidget(title)
 
         sender_layout = QtWidgets.QHBoxLayout()
         from_label = QtWidgets.QLabel("From:")
-        from_label.setStyleSheet(f"font-family: {FONT_FAMILY}; color: {COLORS['--muted']}; font-size: 12px;")
+        from_label.setStyleSheet(
+            f"font-family: {FONT_FAMILY}; color: {COLORS['--muted']}; font-size: 12px;"
+        )
         sender_layout.addWidget(from_label)
 
         sender_name = QtWidgets.QLabel(sender)
-        sender_name.setStyleSheet(f"font-family: {FONT_FAMILY}; font-weight: 600; color: {COLORS['--text']}; font-size: 13px;")
+        sender_name.setStyleSheet(
+            f"font-family: {FONT_FAMILY}; font-weight: 600; color: {COLORS['--text']}; font-size: 13px;"
+        )
         sender_layout.addWidget(sender_name)
         sender_layout.addStretch()
         layout.addLayout(sender_layout)
 
         time_label = QtWidgets.QLabel(time.strftime("%H:%M:%S", time.localtime(ts)))
-        time_label.setStyleSheet(f"font-family: {FONT_FAMILY}; color: {COLORS['--muted']}; font-size: 11px;")
+        time_label.setStyleSheet(
+            f"font-family: {FONT_FAMILY}; color: {COLORS['--muted']}; font-size: 11px;"
+        )
         time_label.setAlignment(QtCore.Qt.AlignRight)
         layout.addWidget(time_label)
 
@@ -743,19 +903,27 @@ class PingNotification(QtWidgets.QWidget):
         self.progress_bar.setTextVisible(False)
         self.progress_bar.setFixedHeight(4)
         self.progress_bar.setStyleSheet(f"""
-            QProgressBar {{ 
-                background-color: {COLORS['--primary']}; 
-                border-radius: 2px; 
-            }} 
-            QProgressBar::chunk {{ 
-                background-color: {COLORS['--highlight']}; 
-                border-radius: 2px; 
+            QProgressBar {{
+                background-color: {COLORS["--primary"]};
+                border-radius: 2px;
+            }}
+            QProgressBar::chunk {{
+                background-color: {COLORS["--highlight"]};
+                border-radius: 2px;
             }}
         """)
         layout.addWidget(self.progress_bar)
 
-        self.enter_anim = QtCore.QPropertyAnimation(self, b"windowOpacity", duration=300, startValue=0.0, endValue=1.0)
-        self.progress_anim = QtCore.QPropertyAnimation(self.progress_bar, b"value", duration=PING_POPUP_DURATION, startValue=100, endValue=0)
+        self.enter_anim = QtCore.QPropertyAnimation(
+            self, b"windowOpacity", duration=300, startValue=0.0, endValue=1.0
+        )
+        self.progress_anim = QtCore.QPropertyAnimation(
+            self.progress_bar,
+            b"value",
+            duration=PING_POPUP_DURATION,
+            startValue=100,
+            endValue=0,
+        )
 
         self.close_timer = QtCore.QTimer(singleShot=True, timeout=self.close)
 
@@ -771,6 +939,7 @@ class PingNotification(QtWidgets.QWidget):
     def mousePressEvent(self, event):
         self.close()
 
+
 class FocusAwareLineEdit(QtWidgets.QLineEdit):
     focusIn = QtCore.pyqtSignal()
     focusOut = QtCore.pyqtSignal()
@@ -782,6 +951,48 @@ class FocusAwareLineEdit(QtWidgets.QLineEdit):
     def focusOutEvent(self, event):
         super().focusOutEvent(event)
         self.focusOut.emit()
+
+
+class RotatingButton(QtWidgets.QPushButton):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._rotation = 0
+        self._animation = QtCore.QVariantAnimation()
+        self._animation.valueChanged.connect(self.set_rotation)
+
+    def get_rotation(self):
+        return self._rotation
+
+    def set_rotation(self, value):
+        self._rotation = value
+        self.update()
+
+    rotation = QtCore.pyqtProperty(float, get_rotation, set_rotation)
+
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+
+        opt = QtWidgets.QStyleOptionButton()
+        self.initStyleOption(opt)
+        self.style().drawControl(
+            QtWidgets.QStyle.CE_PushButtonBevel, opt, painter, self
+        )
+
+        painter.save()
+        painter.translate(self.width() / 2, self.height() / 2)
+        painter.rotate(self._rotation)
+
+        font = self.font()
+        font_metrics = QtGui.QFontMetrics(font)
+        text_width = font_metrics.horizontalAdvance(self.text())
+        text_height = font_metrics.height()
+
+        painter.setFont(font)
+        painter.setPen(QtGui.QPen(self.palette().buttonText().color()))
+        painter.drawText(int(-text_width / 2), int(text_height / 4), self.text())
+        painter.restore()
+
 
 class UserComboBox(QtWidgets.QWidget):
     def __init__(self, parent=None):
@@ -797,33 +1008,33 @@ class UserComboBox(QtWidgets.QWidget):
             placeholderText="Enter username...",
             minimumHeight=36,
             styleSheet=f"""
-                QLineEdit {{ 
-                    font-family: {FONT_FAMILY}; 
-                    background-color: {COLORS['--secondary']}; 
-                    border: 1px solid {COLORS['--primary']}; 
-                    border-top-left-radius: 10px; 
+                QLineEdit {{
+                    font-family: {FONT_FAMILY};
+                    background-color: {COLORS["--secondary"]};
+                    border: 1px solid {COLORS["--primary"]};
+                    border-top-left-radius: 10px;
                     border-bottom-left-radius: 10px;
                     border-top-right-radius: 0px;
                     border-bottom-right-radius: 0px;
                     border-right: none;
-                    padding: 8px 12px; 
-                    font-size: 12px; 
-                    color: {COLORS['--text']}; 
-                    selection-background-color: {COLORS['--accent']};
-                }} 
-                QLineEdit:focus {{ 
-                    border-color: {COLORS['--highlight']}; 
-                    border-right: none;
-                    background-color: {COLORS['--secondary']};
-                }} 
-                QLineEdit::placeholder {{ 
-                    color: {COLORS['--muted']}; 
+                    padding: 8px 12px;
+                    font-size: 12px;
+                    color: {COLORS["--text"]};
+                    selection-background-color: {COLORS["--accent"]};
                 }}
-            """
+                QLineEdit:focus {{
+                    border-color: {COLORS["--highlight"]};
+                    border-right: none;
+                    background-color: {COLORS["--secondary"]};
+                }}
+                QLineEdit::placeholder {{
+                    color: {COLORS["--muted"]};
+                }}
+            """,
         )
         layout.addWidget(self.text_input)
 
-        self.dropdown_button = QtWidgets.QPushButton(
+        self.dropdown_button = RotatingButton(
             "▼",
             minimumHeight=36,
             minimumWidth=36,
@@ -832,32 +1043,44 @@ class UserComboBox(QtWidgets.QWidget):
             styleSheet=f"""
                 QPushButton {{
                     font-family: {FONT_FAMILY};
-                    background-color: {COLORS['--secondary']};
-                    color: {COLORS['--text']};
-                    border: 1px solid {COLORS['--primary']};
+                    background-color: {COLORS["--secondary"]};
+                    color: {COLORS["--text"]};
+                    border: 1px solid {COLORS["--primary"]};
                     border-top-left-radius: 0px;
                     border-bottom-left-radius: 0px;
-                    border-top-right-radius: 8px;
-                    border-bottom-right-radius: 8px;
+                    border-top-right-radius: 10px;
+                    border-bottom-right-radius: 10px;
                     border-left: none;
                     font-size: 10px;
                     padding: 0px;
                 }}
                 QPushButton:hover {{
-                    background-color: {COLORS['--accent']};
+                    background-color: {COLORS["--accent"]};
                 }}
                 QPushButton:pressed {{
-                    background-color: {COLORS['--primary']};
+                    background-color: {COLORS["--primary"]};
                 }}
-            """
+            """,
         )
         layout.addWidget(self.dropdown_button)
+
+        self.rotation_animation = QtCore.QPropertyAnimation(
+            self.dropdown_button, b"rotation"
+        )
+        self.rotation_animation.setDuration(200)
+        self.rotation_animation.setStartValue(0)
+        self.rotation_animation.setEndValue(-90)
 
         self.text_input.focusIn.connect(self._on_input_focus_in)
         self.text_input.focusOut.connect(self._on_input_focus_out)
 
         self.dropdown_menu = QtWidgets.QMenu(self)
-        self.dropdown_menu.setAttribute(QtCore.Qt.WA_TranslucentBackground, False)
+        self.dropdown_menu.setWindowFlags(
+            self.dropdown_menu.windowFlags()
+            | QtCore.Qt.FramelessWindowHint
+            | QtCore.Qt.NoDropShadowWindowHint
+        )
+        self.dropdown_menu.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self._setup_menu_styling()
 
         self.dropdown_button.clicked.connect(self.show_dropdown)
@@ -865,38 +1088,39 @@ class UserComboBox(QtWidgets.QWidget):
     def _setup_menu_styling(self):
         self.dropdown_menu.setStyleSheet(f"""
             QMenu {{
-                background-color: {COLORS['--background']};
-                color: {COLORS['--text']};
-                border: 1px solid {COLORS['--primary']};
-                border-radius: 10px;
+                background-color: {COLORS["--background"]};
+                color: {COLORS["--text"]};
+                border: 1px solid {COLORS["--primary"]};
+                border-radius: 14px;
                 padding: 8px;
                 font-family: {FONT_FAMILY};
                 font-size: 12px;
+                margin: 0px;
             }}
             QMenu::item {{
                 padding: 8px 14px;
-                border-radius: 6px;
+                border-radius: 8px;
                 margin: 2px 2px;
                 font-family: {FONT_FAMILY};
             }}
             QMenu::item:selected {{
-                background-color: {COLORS['--accent']};
+                background-color: {COLORS["--accent"]};
             }}
             QMenu::separator {{
                 height: 1px;
-                background-color: {COLORS['--primary']};
+                background-color: {COLORS["--primary"]};
                 margin: 6px 8px;
                 border-radius: 1px;
             }}
             QMenu::section {{
-                background-color: {COLORS['--secondary']};
-                color: {COLORS['--muted']};
+                background-color: {COLORS["--secondary"]};
+                color: {COLORS["--muted"]};
                 font-weight: bold;
                 font-size: 11px;
                 padding: 8px 12px 6px 12px;
                 border: none;
                 margin: 0px;
-                border-radius: 4px;
+                border-radius: 6px;
                 font-family: {FONT_FAMILY};
             }}
         """)
@@ -905,22 +1129,22 @@ class UserComboBox(QtWidgets.QWidget):
         self.dropdown_button.setStyleSheet(f"""
             QPushButton {{
                 font-family: {FONT_FAMILY};
-                background-color: {COLORS['--secondary']};
-                color: {COLORS['--text']};
-                border: 1px solid {COLORS['--highlight']};
+                background-color: {COLORS["--secondary"]};
+                color: {COLORS["--text"]};
+                border: 1px solid {COLORS["--highlight"]};
                 border-top-left-radius: 0px;
                 border-bottom-left-radius: 0px;
-                border-top-right-radius: 8px;
-                border-bottom-right-radius: 8px;
+                border-top-right-radius: 10px;
+                border-bottom-right-radius: 10px;
                 border-left: none;
                 font-size: 10px;
                 padding: 0px;
             }}
             QPushButton:hover {{
-                background-color: {COLORS['--accent']};
+                background-color: {COLORS["--accent"]};
             }}
             QPushButton:pressed {{
-                background-color: {COLORS['--primary']};
+                background-color: {COLORS["--primary"]};
             }}
         """)
 
@@ -928,38 +1152,52 @@ class UserComboBox(QtWidgets.QWidget):
         self.dropdown_button.setStyleSheet(f"""
             QPushButton {{
                 font-family: {FONT_FAMILY};
-                background-color: {COLORS['--secondary']};
-                color: {COLORS['--text']};
-                border: 1px solid {COLORS['--primary']};
+                background-color: {COLORS["--secondary"]};
+                color: {COLORS["--text"]};
+                border: 1px solid {COLORS["--primary"]};
                 border-top-left-radius: 0px;
                 border-bottom-left-radius: 0px;
-                border-top-right-radius: 8px;
-                border-bottom-right-radius: 8px;
+                border-top-right-radius: 10px;
+                border-bottom-right-radius: 10px;
                 border-left: none;
                 font-size: 10px;
                 padding: 0px;
             }}
             QPushButton:hover {{
-                background-color: {COLORS['--accent']};
+                background-color: {COLORS["--accent"]};
             }}
             QPushButton:pressed {{
-                background-color: {COLORS['--primary']};
+                background-color: {COLORS["--primary"]};
             }}
         """)
 
     def show_dropdown(self):
         self._rebuild_dropdown_menu()
-        pos = self.dropdown_button.mapToGlobal(QtCore.QPoint(0, self.dropdown_button.height()))
+        pos = self.dropdown_button.mapToGlobal(
+            QtCore.QPoint(0, self.dropdown_button.height())
+        )
+
+        self.rotation_animation.setDirection(QtCore.QAbstractAnimation.Forward)
+        self.rotation_animation.start()
+
+        self.dropdown_menu.aboutToHide.connect(self._on_menu_hide)
         self.dropdown_menu.popup(pos)
+
+    def _on_menu_hide(self):
+        self.rotation_animation.setDirection(QtCore.QAbstractAnimation.Backward)
+        self.rotation_animation.start()
+        self.dropdown_menu.aboutToHide.disconnect(self._on_menu_hide)
 
     def _rebuild_dropdown_menu(self):
         self.dropdown_menu.clear()
 
-        if hasattr(self, '_online_users') and self._online_users:
+        if hasattr(self, "_online_users") and self._online_users:
             self.dropdown_menu.addSection("Online Users")
             for user in sorted(self._online_users):
                 action = QtWidgets.QAction(user, self.dropdown_menu)
-                action.triggered.connect(lambda checked, u=user: self.text_input.setText(u))
+                action.triggered.connect(
+                    lambda checked, u=user: self.text_input.setText(u)
+                )
                 self.dropdown_menu.addAction(action)
             self.dropdown_menu.addSeparator()
         else:
@@ -968,11 +1206,13 @@ class UserComboBox(QtWidgets.QWidget):
             self.dropdown_menu.addAction(no_action)
             self.dropdown_menu.addSeparator()
 
-        if hasattr(self, '_recent_users') and self._recent_users:
+        if hasattr(self, "_recent_users") and self._recent_users:
             self.dropdown_menu.addSection("Recent Pings")
             for user in sorted(self._recent_users):
                 action = QtWidgets.QAction(user, self.dropdown_menu)
-                action.triggered.connect(lambda checked, u=user: self.text_input.setText(u))
+                action.triggered.connect(
+                    lambda checked, u=user: self.text_input.setText(u)
+                )
                 self.dropdown_menu.addAction(action)
         else:
             no_recent = QtWidgets.QAction("No recent pings", self.dropdown_menu)
@@ -990,6 +1230,7 @@ class UserComboBox(QtWidgets.QWidget):
 
     def setText(self, text):
         self.text_input.setText(text)
+
 
 class PingWindow(QtWidgets.QWidget):
     def __init__(self, server, username, uid):
@@ -1023,12 +1264,15 @@ class PingWindow(QtWidgets.QWidget):
         self.client = None
         self.signals = GuiSignals()
 
-        self._central = QtWidgets.QWidget(self, styleSheet=f"""
-            background-color: {COLORS['--background']};
+        self._central = QtWidgets.QWidget(
+            self,
+            styleSheet=f"""
+            background-color: {COLORS["--background"]};
             border-radius: {WINDOW_RADIUS}px;
-            border: 1px solid {COLORS['--primary']};
+            border: 1px solid {COLORS["--primary"]};
             font-family: {FONT_FAMILY};
-        """)
+        """,
+        )
         self._central.setGeometry(self.rect())
 
         layout = QtWidgets.QVBoxLayout(self._central)
@@ -1050,13 +1294,13 @@ class PingWindow(QtWidgets.QWidget):
             f"@{self.username}",
             styleSheet=f"""
                 font-family: {FONT_FAMILY};
-                color: {COLORS['--text']};
+                color: {COLORS["--text"]};
                 font-size: 13px;
                 font-weight: 500;
                 background: transparent;
                 border: none;
                 padding: 2px 0px;
-            """
+            """,
         )
         status_layout.addWidget(self.username_label)
 
@@ -1073,8 +1317,8 @@ class PingWindow(QtWidgets.QWidget):
             styleSheet=f"""
                 QPushButton {{
                     font-family: {FONT_FAMILY};
-                    background-color: {COLORS['--accent']};
-                    color: {COLORS['--text']};
+                    background-color: {COLORS["--accent"]};
+                    color: {COLORS["--text"]};
                     font-weight: 600;
                     font-size: 13px;
                     border-radius: 10px;
@@ -1082,16 +1326,16 @@ class PingWindow(QtWidgets.QWidget):
                     border: none;
                 }}
                 QPushButton:hover {{
-                    background-color: {COLORS['--highlight']};
+                    background-color: {COLORS["--highlight"]};
                 }}
                 QPushButton:pressed {{
-                    background-color: {COLORS['--primary']};
+                    background-color: {COLORS["--primary"]};
                 }}
                 QPushButton:disabled {{
-                    background-color: {COLORS['--secondary']};
-                    color: {COLORS['--muted']};
+                    background-color: {COLORS["--secondary"]};
+                    color: {COLORS["--muted"]};
                 }}
-            """
+            """,
         )
         layout.addWidget(self.ping_button)
 
@@ -1101,10 +1345,18 @@ class PingWindow(QtWidgets.QWidget):
         self.signals.ws_connected.connect(lambda: self._update_status(True))
         self.signals.ws_disconnected.connect(lambda: self._update_status(False))
         self.signals.ping_received.connect(self._on_ping_received)
-        self.signals.error.connect(lambda msg: self._show_message("Error", msg, COLORS["--error"]))
-        self.signals.warning.connect(lambda msg: self._show_message("Warning", msg, COLORS["--muted"]))
-        self.signals.info.connect(lambda msg: self._show_message("Info", msg, COLORS["--muted"]))
-        self.signals.success.connect(lambda msg: self._show_message("Success", msg, COLORS["--success"]))
+        self.signals.error.connect(
+            lambda msg: self._show_message("Error", msg, COLORS["--error"])
+        )
+        self.signals.warning.connect(
+            lambda msg: self._show_message("Warning", msg, COLORS["--muted"])
+        )
+        self.signals.info.connect(
+            lambda msg: self._show_message("Info", msg, COLORS["--muted"])
+        )
+        self.signals.success.connect(
+            lambda msg: self._show_message("Success", msg, COLORS["--success"])
+        )
         self.signals.user_list_updated.connect(self._update_user_list)
         self.signals.user_history_updated.connect(self._update_user_history)
         self.ping_button.clicked.connect(self._send_ping)
@@ -1136,30 +1388,37 @@ class PingWindow(QtWidgets.QWidget):
     def _send_ping(self):
         target = self.target_combo.text()
         if not target:
-            self._show_message("Warning", "Please enter a target username", COLORS["--muted"])
+            self._show_message(
+                "Warning", "Please enter a target username", COLORS["--muted"]
+            )
             return
 
         original_text = self.ping_button.text()
         self.ping_button.setText("SENDING...")
         self.ping_button.setEnabled(False)
-        QtCore.QTimer.singleShot(100, lambda: self._actually_send_ping(target, original_text))
+        QtCore.QTimer.singleShot(
+            100, lambda: self._actually_send_ping(target, original_text)
+        )
 
     def _actually_send_ping(self, target, original_text):
         def worker():
             code, data = self.client.send_ping(target)
-            QtCore.QMetaObject.invokeMethod(self, "_ping_complete", 
-                                          QtCore.Qt.QueuedConnection,
-                                          QtCore.Q_ARG(int, code if code is not None else 0),
-                                          QtCore.Q_ARG(str, str(data)),
-                                          QtCore.Q_ARG(str, original_text))
-                
+            QtCore.QMetaObject.invokeMethod(
+                self,
+                "_ping_complete",
+                QtCore.Qt.QueuedConnection,
+                QtCore.Q_ARG(int, code if code is not None else 0),
+                QtCore.Q_ARG(str, str(data)),
+                QtCore.Q_ARG(str, original_text),
+            )
+
         threading.Thread(target=worker, daemon=True).start()
 
     @QtCore.pyqtSlot(int, str, str)
     def _ping_complete(self, code, data, original_text):
         self.ping_button.setText(original_text)
         self.ping_button.setEnabled(True)
-        
+
         if code == 0:
             self.signals.error.emit(f"Network error: {data}")
         elif code == 200:
@@ -1170,38 +1429,52 @@ class PingWindow(QtWidgets.QWidget):
             self.signals.warning.emit(f"Server response {code}: {data}")
 
     def _show_message(self, title, text, color):
-        popup = QtWidgets.QWidget(self, QtCore.Qt.FramelessWindowHint, styleSheet=f"""
+        popup = QtWidgets.QWidget(
+            self,
+            QtCore.Qt.FramelessWindowHint,
+            styleSheet=f"""
             QWidget {{
-                background-color: {COLORS['--background']};
-                border-radius: 10px;
+                background-color: {COLORS["--background"]};
+                border-radius: 14px;
                 border: 1px solid {color};
                 font-family: {FONT_FAMILY};
             }}
-        """)
+        """,
+        )
 
-        popup_overlay = RoundedOverlay(popup, radius=10, opacity=200)
-        
+        popup_overlay = RoundedOverlay(popup, radius=14, opacity=200)
+
         layout = QtWidgets.QVBoxLayout(popup)
-        title_label = QtWidgets.QLabel(title, styleSheet=f"color: {color}; font-size: 13px; font-weight: 600; font-family: {FONT_FAMILY};")
-        text_label = QtWidgets.QLabel(text, styleSheet=f"color: {COLORS['--text']}; font-size: 12px; font-family: {FONT_FAMILY};")
+        title_label = QtWidgets.QLabel(
+            title,
+            styleSheet=f"color: {color}; font-size: 13px; font-weight: 600; font-family: {FONT_FAMILY};",
+        )
+        text_label = QtWidgets.QLabel(
+            text,
+            styleSheet=f"color: {COLORS['--text']}; font-size: 12px; font-family: {FONT_FAMILY};",
+        )
         layout.addWidget(title_label)
         layout.addWidget(text_label)
 
-        btn = QtWidgets.QPushButton("OK", clicked=popup.close, styleSheet=f"""
+        btn = QtWidgets.QPushButton(
+            "OK",
+            clicked=popup.close,
+            styleSheet=f"""
             QPushButton {{
                 font-family: {FONT_FAMILY};
                 background-color: {color};
-                color: {COLORS['--text']};
+                color: {COLORS["--text"]};
                 border: none;
                 padding: 6px 12px;
-                border-radius: 6px;
+                border-radius: 8px;
                 font-size: 11px;
                 margin-top: 8px;
             }}
             QPushButton:hover {{
                 opacity: 0.9;
             }}
-        """)
+        """,
+        )
         layout.addWidget(btn)
 
         popup.resize(200, 120)
@@ -1210,7 +1483,7 @@ class PingWindow(QtWidgets.QWidget):
 
         def resize_popup():
             popup_overlay.setGeometry(popup.rect())
-            
+
         popup.resizeEvent = lambda event: resize_popup()
         resize_popup()
 
@@ -1232,24 +1505,37 @@ class PingWindow(QtWidgets.QWidget):
             self.hide()
             event.ignore()
         else:
-            if hasattr(self, 'client') and self.client:
+            if hasattr(self, "client") and self.client:
                 self.client.stop()
             event.accept()
 
+
 def main():
-    if getattr(sys, 'frozen', False) or (len(sys.argv) > 0 and sys.argv[0].endswith('.exe')):
+    if getattr(sys, "frozen", False) or (
+        len(sys.argv) > 0 and sys.argv[0].endswith(".exe")
+    ):
         print("Performing automatic self-installation...")
         self_install()
     else:
         print("Running as Python script, skipping self-installation")
-    
+
     parser = argparse.ArgumentParser(description=APP_NAME)
-    parser.add_argument("--server", default=None,
-                       help=f"Server URL (default from settings or {DEFAULT_SERVER})")
-    parser.add_argument("--username", default=DEFAULT_USERNAME,
-                       help="Username (default: auto-generated from device name)")
-    parser.add_argument("--instance", type=int, default=DEFAULT_INSTANCE,
-                       help=f"Instance ID (default: {DEFAULT_INSTANCE})")
+    parser.add_argument(
+        "--server",
+        default=None,
+        help=f"Server URL (default from settings or {DEFAULT_SERVER})",
+    )
+    parser.add_argument(
+        "--username",
+        default=DEFAULT_USERNAME,
+        help="Username (default: auto-generated from device name)",
+    )
+    parser.add_argument(
+        "--instance",
+        type=int,
+        default=DEFAULT_INSTANCE,
+        help=f"Instance ID (default: {DEFAULT_INSTANCE})",
+    )
     args = parser.parse_args()
 
     app = QtWidgets.QApplication(sys.argv)
@@ -1292,6 +1578,7 @@ def main():
     threading.Thread(target=client.start, daemon=True).start()
     window.show()
     sys.exit(app.exec_())
+
 
 if __name__ == "__main__":
     main()
