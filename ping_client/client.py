@@ -1212,7 +1212,7 @@ class UserComboBox(QtWidgets.QWidget):
         self.dropdown_menu.clear()
 
         if hasattr(self, "_online_users") and self._online_users:
-            self._add_section("Online Users")
+            self._add_section("Online")
             for user in sorted(self._online_users):
                 action = QtWidgets.QAction(user, self.dropdown_menu)
                 action.triggered.connect(
@@ -1227,7 +1227,7 @@ class UserComboBox(QtWidgets.QWidget):
             self.dropdown_menu.addSeparator()
 
         if hasattr(self, "_recent_users") and self._recent_users:
-            self._add_section("Recent Pings")
+            self._add_section("Recents")
             for user in sorted(self._recent_users):
                 action = QtWidgets.QAction(user, self.dropdown_menu)
                 action.triggered.connect(
