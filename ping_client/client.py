@@ -1188,11 +1188,31 @@ class UserComboBox(QtWidgets.QWidget):
         self.rotation_animation.start()
         self.dropdown_menu.aboutToHide.disconnect(self._on_menu_hide)
 
+    def _add_section(self, title):
+        label = QtWidgets.QLabel(title)
+        label.setStyleSheet("""
+            padding-left: 8px;
+            color: gray;
+            font-weight: bold;
+            font-style: italic;
+            font-variant: small-caps;
+            font-family: Arial, sans-serif;
+            font-size: 8px;
+            text-transform: uppercase;
+            border: none;
+            background: transparent;
+        """)
+        label.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+
+        widget_action = QtWidgets.QWidgetAction(self.dropdown_menu)
+        widget_action.setDefaultWidget(label)
+        self.dropdown_menu.addAction(widget_action)
+
     def _rebuild_dropdown_menu(self):
         self.dropdown_menu.clear()
 
         if hasattr(self, "_online_users") and self._online_users:
-            self.dropdown_menu.addSection("Online Users")
+            self._add_section("Online Users")
             for user in sorted(self._online_users):
                 action = QtWidgets.QAction(user, self.dropdown_menu)
                 action.triggered.connect(
@@ -1207,7 +1227,7 @@ class UserComboBox(QtWidgets.QWidget):
             self.dropdown_menu.addSeparator()
 
         if hasattr(self, "_recent_users") and self._recent_users:
-            self.dropdown_menu.addSection("Recent Pings")
+            self._add_section("Recent Pings")
             for user in sorted(self._recent_users):
                 action = QtWidgets.QAction(user, self.dropdown_menu)
                 action.triggered.connect(
