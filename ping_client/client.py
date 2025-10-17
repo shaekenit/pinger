@@ -28,6 +28,194 @@ LOCAL_APP_DIR = (
     Path(os.getenv("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / APP_NAME
 )
 
+APP_VERSION = "1.2.0"
+GITHUB_REPO_OWNER = "shaekenit"
+GITHUB_REPO_NAME = "pinger"
+GITHUB_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/releases/latest"
+
+
+def check_for_updates():
+    try:
+        response = requests.get(
+            GITHUB_RELEASES_URL,
+            timeout=10,
+            headers={"User-Agent": f"{APP_NAME}/{APP_VERSION}"},
+        )
+        response.raise_for_status()
+
+        release_data = response.json()
+        latest_version = release_data.get("tag_name", "").lstrip("v")
+        download_url = release_data.get("html_url", "")
+
+        if not latest_version:
+            return False, None, None, "No version tag found in release data"
+
+        current_parts = [int(x) for x in APP_VERSION.split(".")]
+        latest_parts = [int(x) for x in latest_version.split(".")]
+
+        max_parts = max(len(current_parts), len(latest_parts))
+        current_parts.extend([0] * (max_parts - len(current_parts)))
+        latest_parts.extend([0] * (max_parts - len(latest_parts)))
+
+        for current, latest in zip(current_parts, latest_parts):
+            if latest > current:
+                return True, latest_version, download_url, None
+            elif latest < current:
+                return False, latest_version, download_url, None
+
+        return False, latest_version, download_url, None
+
+    except requests.exceptions.RequestException as e:
+        return False, None, None, f"Network error: {e}"
+    except Exception as e:
+        return False, None, None, f"Error checking for updates: {e}"
+
+
+def show_update_message(parent, latest_version, download_url):
+    dialog = QtWidgets.QDialog(parent)
+    dialog.setWindowTitle("Update Available")
+    dialog.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+    dialog.setFixedSize(400, 280)
+
+    dialog.setWindowFlags(
+        QtCore.Qt.Dialog
+        | QtCore.Qt.FramelessWindowHint
+        | QtCore.Qt.WindowStaysOnTopHint
+    )
+
+    main_widget = QtWidgets.QWidget(dialog)
+    main_widget.setGeometry(0, 0, 400, 280)
+    main_widget.setStyleSheet(f"""
+        background-color: {COLORS["--background"]};
+        border-radius: 12px;
+    """)
+
+    layout = QtWidgets.QVBoxLayout(main_widget)
+    layout.setContentsMargins(24, 24, 24, 24)
+    layout.setSpacing(16)
+
+    title_label = QtWidgets.QLabel("Update Available")
+    title_label.setStyleSheet(f"""
+        font-family: {FONT_FAMILY};
+        font-size: 18px;
+        font-weight: 600;
+        color: {COLORS["--text"]};
+    """)
+    title_label.setAlignment(QtCore.Qt.AlignCenter)
+    layout.addWidget(title_label)
+
+    message_label = QtWidgets.QLabel(
+        f"A new version of {APP_NAME} is available!\n\n"
+        f"Current version: {APP_VERSION}\n"
+        f"Latest version: {latest_version}"
+    )
+    message_label.setStyleSheet(f"""
+        font-family: {FONT_FAMILY};
+        font-size: 13px;
+        color: {COLORS["--text"]};
+        line-height: 1.4;
+    """)
+    message_label.setAlignment(QtCore.Qt.AlignCenter)
+    message_label.setWordWrap(True)
+    layout.addWidget(message_label)
+
+    question_label = QtWidgets.QLabel("Would you like to download the update?")
+    question_label.setStyleSheet(f"""
+        font-family: {FONT_FAMILY};
+        font-size: 12px;
+        color: {COLORS["--muted"]};
+        font-style: italic;
+    """)
+    question_label.setAlignment(QtCore.Qt.AlignCenter)
+    layout.addWidget(question_label)
+
+    layout.addStretch()
+
+    button_layout = QtWidgets.QHBoxLayout()
+    button_layout.setSpacing(16)
+    button_layout.addStretch()
+
+    no_button = QtWidgets.QPushButton("No")
+    no_button.setFixedHeight(36)
+    no_button.setStyleSheet(f"""
+        QPushButton {{
+            background-color: {COLORS["--secondary"]};
+            color: {COLORS["--text"]};
+            border: 1px solid {COLORS["--primary"]};
+            border-radius: 8px;
+            font-family: {FONT_FAMILY};
+            font-size: 12px;
+            font-weight: 600;
+            min-width: 100px;
+        }}
+        QPushButton:hover {{
+            background-color: {COLORS["--accent"]};
+            border: 1px solid {COLORS["--highlight"]};
+        }}
+        QPushButton:pressed {{
+            background-color: {COLORS["--primary"]};
+        }}
+    """)
+    no_button.clicked.connect(dialog.reject)
+    button_layout.addWidget(no_button)
+
+    yes_button = QtWidgets.QPushButton("Yes")
+    yes_button.setFixedHeight(36)
+    yes_button.setStyleSheet(f"""
+        QPushButton {{
+            background-color: #2e7d32;
+            color: {COLORS["--background"]};
+            border: 1px solid #1b5e20;
+            border-radius: 8px;
+            font-family: {FONT_FAMILY};
+            font-size: 12px;
+            font-weight: 600;
+            min-width: 100px;
+        }}
+        QPushButton:hover {{
+            background-color: #45a049;
+            border: 1px solid #388e3c;
+        }}
+        QPushButton:pressed {{
+            background-color: #1b5e20;
+            border: 1px solid #0f3d12;
+        }}
+    """)
+    yes_button.clicked.connect(dialog.accept)
+    button_layout.addWidget(yes_button)
+
+    button_layout.addStretch()
+    layout.addLayout(button_layout)
+
+    if parent:
+        dialog.move(parent.frameGeometry().center() - dialog.rect().center())
+
+    result = dialog.exec_()
+    if result == QtWidgets.QDialog.Accepted:
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl(download_url))
+
+
+def check_updates_in_background(parent):
+    def check():
+        is_update, latest_version, download_url, error = check_for_updates()
+        if error:
+            print(f"Update check failed: {error}")
+            return
+
+        if is_update:
+            QtCore.QMetaObject.invokeMethod(
+                parent,
+                "show_update_dialog",
+                QtCore.Qt.QueuedConnection,
+                QtCore.Q_ARG(str, latest_version),
+                QtCore.Q_ARG(str, download_url),
+            )
+        else:
+            print(f"Running latest version: {APP_VERSION}")
+
+    thread = threading.Thread(target=check, daemon=True)
+    thread.start()
+
 
 def create_windows_shortcut(target_path, shortcut_path):
     try:
@@ -84,18 +272,18 @@ def self_install():
 
         print(f"Installing {APP_NAME} to: {target_exe}")
         shutil.copy2(current_exe, target_exe)
-        print("✓ Application copied to AppData")
+        print("Application copied to AppData")
 
         if IS_WINDOWS:
             try:
                 desktop = Path.home() / "Desktop"
                 shortcut_file = desktop / f"{APP_NAME}.lnk"
                 if create_windows_shortcut(target_exe, shortcut_file):
-                    print(f"✓ Desktop shortcut created: {shortcut_file}")
+                    print(f"Desktop shortcut created: {shortcut_file}")
                 else:
-                    print("✗ Failed to create desktop shortcut")
+                    print("Failed to create desktop shortcut")
             except Exception as e:
-                print(f"✗ Failed to create desktop shortcut: {e}")
+                print(f"Failed to create desktop shortcut: {e}")
 
         if IS_WINDOWS:
             try:
@@ -109,17 +297,17 @@ def self_install():
                 start_menu.mkdir(parents=True, exist_ok=True)
                 start_menu_shortcut = start_menu / f"{APP_NAME}.lnk"
                 if create_windows_shortcut(target_exe, start_menu_shortcut):
-                    print(f"✓ Start Menu shortcut created: {start_menu_shortcut}")
+                    print(f"Start Menu shortcut created: {start_menu_shortcut}")
                 else:
-                    print("✗ Failed to create Start Menu shortcut")
+                    print("Failed to create Start Menu shortcut")
             except Exception as e:
-                print(f"✗ Failed to create Start Menu shortcut: {e}")
+                print(f"Failed to create Start Menu shortcut: {e}")
 
-        print("✓ Self-installation completed successfully")
+        print("Self-installation completed successfully")
         return True
 
     except Exception as e:
-        print(f"✗ Self-installation failed: {e}")
+        print(f"Self-installation failed: {e}")
         return False
 
 
@@ -159,7 +347,6 @@ WINDOW_RADIUS = 14
 WINDOW_SIZE = 220
 PING_POPUP_DURATION = 5000
 
-APP_VERSION = "1.0.0"
 ORGANIZATION_NAME = "Pinger"
 ORGANIZATION_DOMAIN = "pinger.local"
 FONT_FAMILY = "Segoe UI, Inter, Roboto, -apple-system, BlinkMacSystemFont, sans-serif"
@@ -1270,6 +1457,12 @@ class PingWindow(QtWidgets.QWidget):
 
         QtWidgets.QApplication.setQuitOnLastWindowClosed(False)
 
+        QtCore.QTimer.singleShot(2000, lambda: check_updates_in_background(self))
+
+    @QtCore.pyqtSlot(str, str)
+    def show_update_dialog(self, latest_version, download_url):
+        show_update_message(self, latest_version, download_url)
+
     def setup_window(self):
         self.resize(WINDOW_SIZE, WINDOW_SIZE)
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Tool)
@@ -1531,6 +1724,17 @@ class PingWindow(QtWidgets.QWidget):
 
 
 def main():
+    print(f"{APP_NAME} v{APP_VERSION}")
+
+    is_update, latest_version, download_url, error = check_for_updates()
+    if error:
+        print(f"Update check failed: {error}")
+    elif is_update:
+        print(f"Update available: {latest_version} (current: {APP_VERSION})")
+        print(f"Download at: {download_url}")
+    else:
+        print(f"Running latest version: {APP_VERSION}")
+
     if getattr(sys, "frozen", False) or (
         len(sys.argv) > 0 and sys.argv[0].endswith(".exe")
     ):
