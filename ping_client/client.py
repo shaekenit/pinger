@@ -336,8 +336,10 @@ COLORS = {
     "--primary": "#404040",
     "--secondary": "#2d2d2d",
     "--accent": "#555555",
-    "--success": "#4caf50",
-    "--error": "#f44336",
+    "--success": "#4CAF50",
+    "--error": "#F44336",
+    "--warning": "#FFC107",
+    "--info": "#2196F3",
     "--muted": "#666666",
     "--highlight": "#7e7e7e",
 }
@@ -1149,6 +1151,39 @@ class RotatingButton(QtWidgets.QPushButton):
         self._animation.setEasingCurve(QtCore.QEasingCurve.OutCubic)
         self._animation.valueChanged.connect(self.set_rotation)
 
+        self._icon_pixmap = None
+        self.load_icon()
+
+    def load_icon(self):
+        icon_path = resource_path("dropdown-icon.png")
+        if os.path.exists(icon_path):
+            try:
+                original_pixmap = QtGui.QPixmap(icon_path)
+                if not original_pixmap.isNull():
+                    colored_pixmap = QtGui.QPixmap(original_pixmap.size())
+                    colored_pixmap.fill(QtCore.Qt.transparent)
+
+                    painter = QtGui.QPainter(colored_pixmap)
+                    painter.setCompositionMode(QtGui.QPainter.CompositionMode_Source)
+                    painter.drawPixmap(0, 0, original_pixmap)
+                    painter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceIn)
+
+                    grey_color = QtGui.QColor(COLORS["--highlight"])
+                    painter.fillRect(colored_pixmap.rect(), grey_color)
+                    painter.end()
+
+                    self._icon_pixmap = colored_pixmap.scaled(
+                        16,
+                        16,
+                        QtCore.Qt.KeepAspectRatio,
+                        QtCore.Qt.SmoothTransformation,
+                    )
+                else:
+                    self._icon_pixmap = None
+            except Exception as e:
+                print(f"Failed to load dropdown icon: {e}")
+                self._icon_pixmap = None
+
     def get_rotation(self):
         return self._rotation
 
@@ -1168,19 +1203,33 @@ class RotatingButton(QtWidgets.QPushButton):
             QtWidgets.QStyle.CE_PushButtonBevel, opt, painter, self
         )
 
-        painter.save()
-        painter.translate(self.width() / 2, self.height() / 2)
-        painter.rotate(self._rotation)
+        if self._icon_pixmap and not self._icon_pixmap.isNull():
+            painter.save()
+            painter.translate(self.width() / 2, self.height() / 2)
+            painter.rotate(self._rotation)
 
-        font = self.font()
-        font_metrics = QtGui.QFontMetrics(font)
-        text_width = font_metrics.horizontalAdvance(self.text())
-        text_height = font_metrics.height()
+            icon_rect = QtCore.QRect(
+                -self._icon_pixmap.width() // 2,
+                -self._icon_pixmap.height() // 2,
+                self._icon_pixmap.width(),
+                self._icon_pixmap.height(),
+            )
+            painter.drawPixmap(icon_rect, self._icon_pixmap)
+            painter.restore()
+        else:
+            painter.save()
+            painter.translate(self.width() / 2, self.height() / 2)
+            painter.rotate(self._rotation)
 
-        painter.setFont(font)
-        painter.setPen(QtGui.QPen(self.palette().buttonText().color()))
-        painter.drawText(int(-text_width / 2), int(text_height / 4), self.text())
-        painter.restore()
+            font = self.font()
+            font_metrics = QtGui.QFontMetrics(font)
+            text_width = font_metrics.horizontalAdvance(self.text())
+            text_height = font_metrics.height()
+
+            painter.setFont(font)
+            painter.setPen(QtGui.QPen(self.palette().buttonText().color()))
+            painter.drawText(int(-text_width / 2), int(text_height / 4), self.text())
+            painter.restore()
 
 
 class UserComboBox(QtWidgets.QWidget):
@@ -1224,7 +1273,7 @@ class UserComboBox(QtWidgets.QWidget):
         layout.addWidget(self.text_input)
 
         self.dropdown_button = RotatingButton(
-            "▼",
+            "",
             minimumHeight=36,
             minimumWidth=36,
             maximumWidth=36,
@@ -1273,7 +1322,8 @@ class UserComboBox(QtWidgets.QWidget):
         self.dropdown_menu.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self._setup_menu_styling()
 
-        self.dropdown_button.clicked.connect(self.show_dropdown)
+        self.dropdown_button.clicked.connect(self.toggle_dropdown)
+        self._menu_visible = False
 
     def _setup_menu_styling(self):
         self.dropdown_menu.setStyleSheet(f"""
@@ -1361,6 +1411,12 @@ class UserComboBox(QtWidgets.QWidget):
             }}
         """)
 
+    def toggle_dropdown(self):
+        if self._menu_visible:
+            self.hide_dropdown()
+        else:
+            self.show_dropdown()
+
     def show_dropdown(self):
         self._rebuild_dropdown_menu()
         pos = self.dropdown_button.mapToGlobal(
@@ -1372,8 +1428,16 @@ class UserComboBox(QtWidgets.QWidget):
 
         self.dropdown_menu.aboutToHide.connect(self._on_menu_hide)
         self.dropdown_menu.popup(pos)
+        self._menu_visible = True
+
+    def hide_dropdown(self):
+        self.dropdown_menu.hide()
+        self._menu_visible = False
+        self.rotation_animation.setDirection(QtCore.QAbstractAnimation.Backward)
+        self.rotation_animation.start()
 
     def _on_menu_hide(self):
+        self._menu_visible = False
         self.rotation_animation.setDirection(QtCore.QAbstractAnimation.Backward)
         self.rotation_animation.start()
         self.dropdown_menu.aboutToHide.disconnect(self._on_menu_hide)

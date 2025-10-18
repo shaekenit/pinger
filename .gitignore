@@ -2,6 +2,7 @@ __pycache__/
 venv311/
 build/
 dist/
+ping_client/*.png
 *.sqlite3
 *.spec
 *.env
