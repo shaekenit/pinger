@@ -28,7 +28,7 @@ LOCAL_APP_DIR = (
     Path(os.getenv("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / APP_NAME
 )
 
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.2.1"
 GITHUB_REPO_OWNER = "shaekenit"
 GITHUB_REPO_NAME = "pinger"
 GITHUB_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/releases/latest"
@@ -1558,18 +1558,7 @@ class PingWindow(QtWidgets.QWidget):
         self.signals.ws_connected.connect(lambda: self._update_status(True))
         self.signals.ws_disconnected.connect(lambda: self._update_status(False))
         self.signals.ping_received.connect(self._on_ping_received)
-        self.signals.error.connect(
-            lambda msg: self._show_message("Error", msg, COLORS["--error"])
-        )
-        self.signals.warning.connect(
-            lambda msg: self._show_message("Warning", msg, COLORS["--muted"])
-        )
-        self.signals.info.connect(
-            lambda msg: self._show_message("Info", msg, COLORS["--muted"])
-        )
-        self.signals.success.connect(
-            lambda msg: self._show_message("Success", msg, COLORS["--success"])
-        )
+        # Remove the signal connections that show popup messages for ping results
         self.signals.user_list_updated.connect(self._update_user_list)
         self.signals.user_history_updated.connect(self._update_user_history)
         self.ping_button.clicked.connect(self._send_ping)
@@ -1601,9 +1590,6 @@ class PingWindow(QtWidgets.QWidget):
     def _send_ping(self):
         target = self.target_combo.text()
         if not target:
-            self._show_message(
-                "Warning", "Please enter a target username", COLORS["--muted"]
-            )
             return
 
         original_text = self.ping_button.text()
@@ -1632,73 +1618,8 @@ class PingWindow(QtWidgets.QWidget):
         self.ping_button.setText(original_text)
         self.ping_button.setEnabled(True)
 
-        if code == 0:
-            self.signals.error.emit(f"Network error: {data}")
-        elif code == 200:
-            self.signals.success.emit("Ping delivered successfully")
-        elif code == 202:
-            self.signals.info.emit("Target offline - ping queued")
-        else:
-            self.signals.warning.emit(f"Server response {code}: {data}")
-
-    def _show_message(self, title, text, color):
-        popup = QtWidgets.QWidget(
-            self,
-            QtCore.Qt.FramelessWindowHint,
-            styleSheet=f"""
-            QWidget {{
-                background-color: {COLORS["--background"]};
-                border-radius: 14px;
-                border: 1px solid {color};
-                font-family: {FONT_FAMILY};
-            }}
-        """,
-        )
-
-        popup_overlay = RoundedOverlay(popup, radius=14, opacity=200)
-
-        layout = QtWidgets.QVBoxLayout(popup)
-        title_label = QtWidgets.QLabel(
-            title,
-            styleSheet=f"color: {color}; font-size: 13px; font-weight: 600; font-family: {FONT_FAMILY};",
-        )
-        text_label = QtWidgets.QLabel(
-            text,
-            styleSheet=f"color: {COLORS['--text']}; font-size: 12px; font-family: {FONT_FAMILY};",
-        )
-        layout.addWidget(title_label)
-        layout.addWidget(text_label)
-
-        btn = QtWidgets.QPushButton(
-            "OK",
-            clicked=popup.close,
-            styleSheet=f"""
-            QPushButton {{
-                font-family: {FONT_FAMILY};
-                background-color: {color};
-                color: {COLORS["--text"]};
-                border: none;
-                padding: 6px 12px;
-                border-radius: 8px;
-                font-size: 11px;
-                margin-top: 8px;
-            }}
-            QPushButton:hover {{
-                opacity: 0.9;
-            }}
-        """,
-        )
-        layout.addWidget(btn)
-
-        popup.resize(200, 120)
-        popup.move(self.geometry().center() - popup.rect().center())
-        popup.show()
-
-        def resize_popup():
-            popup_overlay.setGeometry(popup.rect())
-
-        popup.resizeEvent = lambda event: resize_popup()
-        resize_popup()
+        # Simply reset the button without showing any popup
+        # The ping has been sent, no need for confirmation
 
     def _on_ping_received(self, sender, ts):
         self.sound_player.play()
