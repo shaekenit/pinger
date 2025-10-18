@@ -21,7 +21,7 @@ jobs:
         python-version: '3.12'
         cache: 'pip'
     - run: pip install -r .\ping_client\requirements.txt
-    - run: pyinstaller --onefile --windowed --name "Pinger" --icon=".\assets\app_icon.ico" --add-data "..\assets;assets" .\ping_client\client.py
+    - run: pyinstaller --onefile --windowed --name "Pinger" --icon=".\assets\app_icon.ico" --add-data ".\assets\*" .\ping_client\client.py
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v4
       with:
