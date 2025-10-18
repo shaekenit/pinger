@@ -1558,7 +1558,6 @@ class PingWindow(QtWidgets.QWidget):
         self.signals.ws_connected.connect(lambda: self._update_status(True))
         self.signals.ws_disconnected.connect(lambda: self._update_status(False))
         self.signals.ping_received.connect(self._on_ping_received)
-        # Remove the signal connections that show popup messages for ping results
         self.signals.user_list_updated.connect(self._update_user_list)
         self.signals.user_history_updated.connect(self._update_user_history)
         self.ping_button.clicked.connect(self._send_ping)
@@ -1617,9 +1616,6 @@ class PingWindow(QtWidgets.QWidget):
     def _ping_complete(self, code, data, original_text):
         self.ping_button.setText(original_text)
         self.ping_button.setEnabled(True)
-
-        # Simply reset the button without showing any popup
-        # The ping has been sent, no need for confirmation
 
     def _on_ping_received(self, sender, ts):
         self.sound_player.play()
