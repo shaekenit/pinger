@@ -1145,6 +1145,8 @@ class RotatingButton(QtWidgets.QPushButton):
         super().__init__(*args, **kwargs)
         self._rotation = 0
         self._animation = QtCore.QVariantAnimation()
+        self._animation.setDuration(300)
+        self._animation.setEasingCurve(QtCore.QEasingCurve.OutCubic)
         self._animation.valueChanged.connect(self.set_rotation)
 
     def get_rotation(self):
@@ -1254,7 +1256,8 @@ class UserComboBox(QtWidgets.QWidget):
         self.rotation_animation = QtCore.QPropertyAnimation(
             self.dropdown_button, b"rotation"
         )
-        self.rotation_animation.setDuration(200)
+        self.rotation_animation.setDuration(300)
+        self.rotation_animation.setEasingCurve(QtCore.QEasingCurve.OutCubic)
         self.rotation_animation.setStartValue(0)
         self.rotation_animation.setEndValue(-90)
 
