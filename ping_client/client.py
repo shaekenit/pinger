@@ -28,7 +28,7 @@ LOCAL_APP_DIR = (
     Path(os.getenv("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / APP_NAME
 )
 
-APP_VERSION = "1.2.1"
+APP_VERSION = "1.3.0"
 GITHUB_REPO_OWNER = "shaekenit"
 GITHUB_REPO_NAME = "pinger"
 GITHUB_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/releases/latest"
